@@ -122,6 +122,17 @@ Modules: `chunker.py`, `embedders.py`, `store.py`, `retrieval.py`, `llm.py`,
 - `POST /seed` — load the built-in Nimbus 900 sample corpus
 - `GET /eval` — golden-set hit-rate@3 / MRR
 
+## Security
+
+raglite is a **local dev/demo service with no auth by design** — bind it to
+localhost and keep it there. If you ever front it beyond localhost, put a
+reverse proxy with auth + TLS in front. Every response carries strict security
+headers (CSP `default-src 'none'`, `X-Frame-Options: DENY`, nosniff,
+no-store), request bodies are capped at 10 MB (413), ingest/query payloads
+have documented size limits, and errors are generic JSON — internals are
+logged, never echoed. CI additionally runs bandit, pip-audit (pinned
+`requirements.txt`), and gitleaks. Full threat model: [SECURITY.md](SECURITY.md).
+
 ## Honest limitations
 
 - **The hashing embedder is a stand-in for real embeddings.** It captures
@@ -142,10 +153,12 @@ Modules: `chunker.py`, `embedders.py`, `store.py`, `retrieval.py`, `llm.py`,
 ```bash
 pip install -e .[dev]
 ruff check .
-pytest          # 38 tests, zero network
+pytest          # 50 tests, zero network
 ```
 
-CI (GitHub Actions, Python 3.11 + 3.12): install, `ruff check`, `pytest`.
+CI (GitHub Actions, Python 3.11 + 3.12): install, `ruff check`, `pytest`,
+plus a security job (bandit + pip-audit) and gitleaks. All actions are pinned
+to full commit SHAs.
 
 ## License
 
