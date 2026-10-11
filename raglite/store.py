@@ -12,7 +12,7 @@ BLOB) so both retrieval paths always see the same corpus.
 from __future__ import annotations
 
 import math
-import pickle
+import pickle  # B403 justified: BLOBs come only from our own SQLite file, see load() # nosec
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -213,5 +213,7 @@ class BM25Index:
         return pickle.dumps(state)
 
     def load(self, data: bytes) -> None:
-        state = pickle.loads(data)
+        # B301 justified: pickle input is a BLOB this process wrote into its own
+        # SQLite file; the DB path is operator-controlled, never remote input.
+        state = pickle.loads(data)  # nosec
         self.k1, self.b, self._postings, self._df, self._doc_len, self._total_len = state
