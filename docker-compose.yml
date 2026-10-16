@@ -1,0 +1,31 @@
+# raglite — local single-service deployment.
+# Copy .env.example to .env to override the defaults below.
+# raglite has no auth by design: the host port is bound to 127.0.0.1 only.
+
+services:
+  raglite:
+    build: .
+    image: raglite:local
+    ports:
+      - "127.0.0.1:${RAGLITE_PORT:-8000}:8000"
+    environment:
+      RAGLITE_INDEX_PATH: ${RAGLITE_INDEX_PATH:-/data/index.db}
+      RAGLITE_UI: ${RAGLITE_UI:-1}
+      RAGLITE_EMBEDDING_DIM: ${RAGLITE_EMBEDDING_DIM:-256}
+    volumes:
+      # Named volume holding the SQLite index (chunks + vectors + BM25 state).
+      - raglite-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  raglite-data:
