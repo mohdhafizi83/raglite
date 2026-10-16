@@ -80,6 +80,12 @@ class RAGLite:
         # Optional corpus snapshot so the embedder can keep IDF stats current.
         self._corpus: list[str] = list(corpus) if corpus is not None else []
         self._restore_bm25()
+        if corpus is None and self.store.count() > 0:
+            # Restarted against a persisted index: rebuild corpus stats from the
+            # stored chunks so query-time embeddings match the stored vectors.
+            self._corpus = [t for _, t in self.store.all_texts()]
+            if isinstance(self.embedder, HashingEmbedder):
+                self.embedder.fit(self._corpus)
 
     # -- ingestion ----------------------------------------------------------
 

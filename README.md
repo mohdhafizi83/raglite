@@ -31,8 +31,22 @@ watch, and the whole thing is hermetically offline.
 pip install -e .
 raglite demo        # seeds a sample corpus, answers 3 questions, prints eval
 raglite eval        # golden-set eval: hit-rate@3 and MRR
-raglite serve       # FastAPI on http://127.0.0.1:8000 (POST /ingest, POST /query)
+raglite serve       # FastAPI + web UI on http://127.0.0.1:8000 (POST /ingest, POST /query)
 ```
+
+Or with Docker (index persists in a named volume):
+
+```bash
+cp .env.example .env    # optional — all defaults are sane
+docker compose up -d --build
+```
+
+Open **http://127.0.0.1:8000** for the built-in web UI: query box with scores
+and citations, ingest form, document list. Dark-first design tokens, no CDN,
+no build step; disable with `RAGLITE_UI=0` for the pure JSON API. Full setup:
+[docs/getting-started.md](docs/getting-started.md) · every knob:
+[docs/configuration.md](docs/configuration.md) · measuring quality:
+[docs/eval-harness.md](docs/eval-harness.md).
 
 ### Exact demo output (`raglite demo`)
 
@@ -112,15 +126,17 @@ query(q) ──> BM25 top-20  ┐
 ```
 
 Modules: `chunker.py`, `embedders.py`, `store.py`, `retrieval.py`, `llm.py`,
-`pipeline.py`, `eval.py`, `app.py` (FastAPI), `cli.py`.
+`pipeline.py`, `eval.py`, `app.py` (FastAPI), `web.py` (optional UI), `cli.py`.
 
 ## API
 
+- `GET /` — built-in web UI (disable with `RAGLITE_UI=0`)
 - `GET /health` — liveness + index size
 - `POST /ingest` — `{doc_id, text, meta?}` → chunk count
 - `POST /query` — `{question, top_k?}` → `{answer, citations[], scores[]}`
 - `POST /seed` — load the built-in Nimbus 900 sample corpus
 - `GET /eval` — golden-set hit-rate@3 / MRR
+- `GET /api/docs` — documents in the index (UI helper)
 
 ## Security
 

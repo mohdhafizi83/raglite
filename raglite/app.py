@@ -15,20 +15,38 @@ Hardening (see SECURITY.md):
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
+from raglite.embedders import HashingEmbedder
 from raglite.eval import evaluate
 from raglite.pipeline import RAGLite
 from raglite.sample_corpus import seed
 
 logger = logging.getLogger("raglite.app")
 
+
+def _env_int(name: str, default: int) -> int:
+    """Env override for an int setting; falls back to ``default`` if unset/bogus."""
+    raw = os.environ.get(name, "").strip()
+    try:
+        return int(raw) if raw else default
+    except ValueError:
+        logger.warning("ignoring non-integer %s=%r", name, raw)
+        return default
+
+
 app = FastAPI(title="raglite", version="0.1.0", description="Minimal offline hybrid RAG service.")
-engine = RAGLite()
+
+# Configuration (see docs/configuration.md). Default index is in-memory so the
+# pure API/tests stay hermetic; Docker sets RAGLITE_INDEX_PATH to a volume path.
+INDEX_PATH = os.environ.get("RAGLITE_INDEX_PATH", ":memory:")
+EMBEDDING_DIM = _env_int("RAGLITE_EMBEDDING_DIM", 256)
+engine = RAGLite(store_path=INDEX_PATH, embedder=HashingEmbedder(dim=EMBEDDING_DIM))
 
 # -- hardening limits ---------------------------------------------------------
 
@@ -74,7 +92,10 @@ async def security_middleware(request: Request, call_next):
             )
     response = await call_next(request)
     for key, value in _SECURITY_HEADERS.items():
-        response.headers[key] = value
+        # A route may set its own stricter/looser variant (the web UI relaxes CSP
+        # for its inline styles); never overwrite what the route decided.
+        if key not in response.headers:
+            response.headers[key] = value
     return response
 
 
@@ -163,3 +184,13 @@ def eval_endpoint() -> dict[str, object]:
     if engine.store.count() == 0:
         raise HTTPException(status_code=409, detail="index is empty; POST /seed first")
     return evaluate(engine).to_dict()
+
+
+# -- optional web UI -----------------------------------------------------------
+# Mounted by default (RAGLITE_UI=0 disables it). The JSON API above is unchanged
+# either way; the UI is a thin single-page client over the same endpoints.
+
+if os.environ.get("RAGLITE_UI", "1") != "0":
+    from raglite.web import mount_ui
+
+    mount_ui(app, engine)

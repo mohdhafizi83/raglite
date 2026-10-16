@@ -86,6 +86,13 @@ class VectorStore:
     def count(self) -> int:
         return int(self._conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0])
 
+    def doc_summary(self) -> list[tuple[str, int]]:
+        """``(doc_id, chunk_count)`` per distinct document, ordered by doc_id."""
+        rows = self._conn.execute(
+            "SELECT doc_id, COUNT(*) FROM chunks GROUP BY doc_id ORDER BY doc_id"
+        ).fetchall()
+        return [(str(r[0]), int(r[1])) for r in rows]
+
     def get(self, chunk_id: int) -> StoredChunk:
         row = self._conn.execute(
             "SELECT chunk_id, doc_id, text, start, end, meta FROM chunks WHERE chunk_id = ?",
